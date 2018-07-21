@@ -53,7 +53,7 @@ def handle_command(command, channel):
 
     # This is where you start to implement more commands!
     if command.startswith(DO_COMMAND):
-        #response = "/remind #int-elligence hihi in 1 minute"
+        response = "/remind #int-elligence hihi in 1 minute"
         latest_post()
 
            
@@ -137,12 +137,21 @@ if __name__ == "__main__":
         t = dt.datetime.now()
         minute_count = 0 
         while True:
-            delta = dt.datetime.now()-t              
-            if delta.seconds >= 300:
-                counting()
+            sleep(1)
+            #print("done 10 sec")
+            #delta = dt.datetime.now()-t
+            #if delta.seconds >= 10:
+            print("10")
+            command, channel = parse_bot_commands(bot_client.rtm_read())
+            if command:
+                print("handle command")
+                handle_command(command, channel)
+            #handle_command(command, channel)
+            #counting()
                 #slack_client.api_call("chat.postMessage", channel = channel_code, text = "HOT(lots of emojis)" )
                 #slack_client.api_call("chat.postMessage", channel = channel_code, text = "this event happended 10 seconds ago!!!" + str(i['text']))
-                t = dt.datetime.now()
+                #t = dt.datetime.now()
+            
         #member_join()
                 
         starterbot_id = bot_client.api_call("auth.test")["user_id"]
