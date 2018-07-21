@@ -3,13 +3,38 @@ from datetime import datetime
 from flask_pymongo import PyMongo
 from slackclient import SlackClient
 import os, random, json
+
+import time
+import atexit
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+
+def print_date_time():
+    print("hello")
+
+scheduler = BackgroundScheduler()
+scheduler.start()
+scheduler.add_job(
+    func=print_date_time,
+    trigger=IntervalTrigger(seconds=60),
+    id='printing_job',
+    name='Print date and time every five seconds',
+    replace_existing=True)
+# Shut down the scheduler when exiting the app
+atexit.register(lambda: scheduler.shutdown())
+
 app = Flask(__name__)
 
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
+slack_client_oauth = SlackClient(os.environ.get('SLACK_BOT_TOKEN_OAUTH'))
 
 app.config['MONGO_URI'] = "mongodb://slackathon:slackathon1@ds145951.mlab.com:45951/slackathon-bot"
 app.config['MONGO_DBNAME'] = "slackathon-bot"
 mongo = PyMongo(app)
+
+INTERNAL_CACHE = {}
+
+COUNT_THRESHOLD = 2
 
 DIALOG_SNIPPET = {
     "title": "Enter a milestone!",
@@ -48,6 +73,17 @@ MANUAL_MILESTONE = {
     ]
 }
 
+SUGGESTED_MILESTONE = {
+    "text": "Hi there! We noticed that this is an exciting time so we added a message as a milestone!",
+    "fallback": "Oh no, it failed.",
+    "callback_id": "manual_add_text",
+    "color": "#3AA3E3",
+    "attachment_type": "default"
+}
+
+@app.route('/add', methods=['GET'])
+def add():
+    return "ok"
 
 @app.route('/', methods=['GET', 'POST'])
 def homepage():
@@ -73,13 +109,38 @@ def homepage():
         # Slack just sent an event
         elif request.content_type == "application/json":
             data = request.get_json()
-            print(data)
             response = dict()
             if data.get('event', ''):
                 event_type = data['event'].get('type', '')
                 event_text = data['event'].get('text', '')[12:]
                 # if the user uses the 'add' keyword
-                print(event_type, event_text)
+                if event_type == "reaction_added":
+                    message_time = data['event']['item']['ts']
+                    if message_time in INTERNAL_CACHE:
+                        INTERNAL_CACHE[data['event']['item']['ts']]['count'] += 1
+                        if INTERNAL_CACHE[data['event']['item']['ts']]['count'] > COUNT_THRESHOLD and not INTERNAL_CACHE[message_time].get('stored'):
+                            slack_client.api_call(
+                                "chat.postMessage",
+                                channel="CBVS7HV1C",
+                                text="Good morning, int-elligence!",
+                                attachments=[SUGGESTED_MILESTONE]
+                            )
+                            # do this after the user adds shit
+                            messages = slack_client_oauth.api_call(
+                                "channels.history",
+                                channel="CBVS7HV1C",
+                                latest=data['event']['item']['ts'],
+                                count=1
+                            )
+                            INTERNAL_CACHE[message_time]['text'] = messages['messages'][0]['text']
+                            mongo.db.channel_history.insert({message_time.replace(".","-"): INTERNAL_CACHE[message_time]})
+                            INTERNAL_CACHE[message_time]['stored'] = True
+                            print("wrote to database")
+                    else:
+                        INTERNAL_CACHE[message_time] = {}
+                        INTERNAL_CACHE[message_time]['item'] = data['event']['item']
+                        INTERNAL_CACHE[message_time]['count'] = 1
+                    print(INTERNAL_CACHE[data['event']['item']['ts']]['count'])
                 if event_type == "app_mention" and "add" in event_text:
                     slack_client.api_call(
                         "chat.postMessage",
