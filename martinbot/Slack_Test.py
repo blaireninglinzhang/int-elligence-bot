@@ -95,7 +95,7 @@ def handle_command(command, channel):
             timestamp= timestamp
             )
 
-        #print(reactions)              
+        print(reactions)              
     elif command.startswith(HELLO_COMMAND):
         response = "Hi everyone! I'm a bot, bleep, bloop."
 
