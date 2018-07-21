@@ -3,81 +3,47 @@ import json
 import time
 import re
 from slackclient import SlackClient
+from slackeventsapi import SlackEventAdapter
 
+# slack_client = SlackClient('xoxb-369235392373-402130295793-JB7yKDAzWZ9DnKtehmWGxlYA')
+BOT_TOKEN = "xoxb-369235392373-402130295793-JB7yKDAzWZ9DnKtehmWGxlYA"
+CHANNEL_NAME = "int-elligence"
 
-# instantiate Slack client
-slack_client = SlackClient('xoxb-369235392373-402130295793-JB7yKDAzWZ9DnKtehmWGxlYA')
+slack_events_adapter = SlackEventAdapter("NExx1buddCGoKEtFOwYJ2Gkb", endpoint="/slack/events")
 
-# starterbot's user ID in Slack: value is assigned after the bot starts up
-starterbot_id = None
+# Create an event listener for "reaction_added" events and print the emoji name
+@slack_events_adapter.on("reaction_added")
+def reaction_added(event_data):
+  event = event_data["event"]
+  emoji = event["reaction"]
+  print(event)
+  print(emoji)
 
+slack_events_adapter.start(port=8000)
 
+def main():
+    # Create the slackclient instance
+    sc = SlackClient(BOT_TOKEN)
 
-# constants
-RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-DO_COMMAND = "do"
-HELLO_COMMAND = 'hello'
-MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
+    # Connect to slack
+    if sc.rtm_connect():
+        # Send first message
+        sc.rtm_send_message(CHANNEL_NAME, "I'm ALIVE!!!")
 
-
-def parse_bot_commands(slack_events):
-    """
-        Parses a list of events coming from the Slack RTM API to find bot commands.
-        If a bot command is found, this function returns a tuple of command and channel.
-        If its not found, then this function returns None, None.
-    """
-    for event in slack_events:
-        if event["type"] == "message" and not "subtype" in event:
-            user_id, message = parse_direct_mention(event["text"])
-            if user_id == starterbot_id:
-                return message, event["channel"]
-    return None, None
-
-
-def parse_direct_mention(message_text):
-    """
-        Finds a direct mention (a mention that is at the beginning) in message text
-        and returns the user ID which was mentioned. If there is no direct mention, returns None
-    """
-    matches = re.search(MENTION_REGEX, message_text)
-    # the first group contains the username, the second group contains the remaining message
-    return (matches.group(1), matches.group(2).strip()) if matches else (None, None)
-
-
-def handle_command(command, channel):
-    """
-        Executes bot command if the command is known
-    """
-    # Default response is help text for the user
-    default_response = "Not sure what you mean. Try {0}.".format(DO_COMMAND)
-
-    # Finds and executes the given command, filling in response
-    response = None
-
-    # This is where you start to implement more commands!
-    if command.startswith(DO_COMMAND):
-        response = "Sure...write some more code then I can do that!"
-    elif command.startswith(HELLO_COMMAND):
-        response = "Hi everyone! I'm a bot, bleep, bloop."
-
-    # Sends the response back to the channel
-    slack_client.api_call(
-        "chat.postMessage",
-        channel=channel,
-        text=response or default_response
-    )
-
-
-if __name__ == "__main__":
-    if slack_client.rtm_connect(with_team_state=False):
-        print("Starter Bot connected and running!")
-
-        # Read bot's user ID by calling Web API method `auth.test`
-        starterbot_id = slack_client.api_call("auth.test")["user_id"]
         while True:
-            command, channel = parse_bot_commands(slack_client.rtm_read())
-            if command:
-                handle_command(command, channel)
-            time.sleep(RTM_READ_DELAY)
+            # Read latest messages
+            # TODO: use emoji to do something
+            
+            for slack_message in sc.rtm_read():
+                message = slack_message.get("text")
+                user = slack_message.get("user")
+                if not message or not user:
+                    continue
+                sc.rtm_send_message(CHANNEL_NAME, "<@{}> wrote something...".format(user))
+            # Sleep for half a second
+            time.sleep(0.5)
     else:
-        print("Connection failed. Exception traceback printed above.")
+        print("Couldn't connect to slack")
+
+if __name__ == '__main__':
+    main()
