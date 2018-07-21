@@ -6,8 +6,8 @@ from slackclient import SlackClient
 
 
 # instantiate Slack client
-slack_client = SlackClient('xoxp-369235392373-394289804691-402685810066-a1f17bba5172e3d876455962b7796c6e')
-bot_client = SlackClient('xoxb-369235392373-404015005318-fwClSJ0ywbTWjjckqbFTeE4P')
+slack_client = SlackClient('xoxp-369235392373-394289804691-402167874849-96954213365860c4e8fe67dcd36b7d91')
+bot_client = SlackClient('xoxb-369235392373-404015005318-bECdwvQkRTYlhY4S5D6jM2DL')
 # starterbot's user ID in Slack: value is assigned after the bot starts up
 starterbot_id = None
 
@@ -85,7 +85,7 @@ def handle_command(command, channel):
             
         timestamp = history["messages"][0]["ts"]
       
-        #print("timestamp: " + timestamp)
+        print("timestamp: " + timestamp)
 
         
         reactions = slack_client.api_call(
