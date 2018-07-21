@@ -11,34 +11,16 @@ app.config['MONGO_URI'] = "mongodb://slackathon:slackathon1@ds145951.mlab.com:45
 app.config['MONGO_DBNAME'] = "slackathon-bot"
 mongo = PyMongo(app)
 
-CONFIRMATION_DIALOG = {
-    "title": "Request a coffee",
+DIALOG_SNIPPET = {
+    "title": "Enter a milestone!",
     "submit_label": "Submit",
-    "callback_id": "coffee_order_form",
+    "callback_id": "milestone_form",
     "elements": [
         {
-            "label": "Coffee Type",
-            "type": "select",
-            "name": "meal_preferences",
-            "placeholder": "Select a drink",
-            "options": [
-                {
-                    "label": "Cappuccino",
-                    "value": "cappuccino"
-                },
-                {
-                    "label": "Latte",
-                    "value": "latte"
-                },
-                {
-                    "label": "Pour Over",
-                    "value": "pour_over"
-                },
-                {
-                    "label": "Cold Brew",
-                    "value": "cold_brew"
-                }
-            ]
+            "label": "Milestone name: ",
+            "type": "text",
+            "name": "milestone_name",
+            "placeholder": "We bought a chicken!",
         }
     ]
 }
@@ -74,27 +56,16 @@ def homepage():
         if request.content_type == "application/x-www-form-urlencoded":
             data = json.loads(request.form['payload'])
             print(data.keys())
+            print(data)
+            if data.get('callback_id', '') == "milestone_form" and data.get('submission'):
+                print(data['submission']['milestone_name'])
             if data.get('callback_id', '') == "manual_add_text" and data.get("actions"):
                 if data["actions"][0]["name"] == "manual_add_yes":
-                    print("i am working")
                     slack_client.api_call(
                         "dialog.open",
                         trigger_id=data["trigger_id"],
-                        dialog={
-                            "title": "Request a coffee",
-                            "submit_label": "Submit",
-                            "callback_id":  "coffee_order_form",
-                            "elements": [
-                                {
-                                    "label": "Coffee Type",
-                                    "type": "text",
-                                    "name": "meal_preferences",
-                                    "placeholder": "Select a drink",
-                                }
-                            ]
-                            }
+                        dialog=DIALOG_SNIPPET
                     )
-                    return "hello"
                 else:
                     return "SAD"
             else:
@@ -131,15 +102,6 @@ def homepage():
     <p>It is currently {time}.</p>
     <img src="http://loremflickr.com/600/400">
         """.format(time=the_time)
-
-#  @app.route('/check-for-events', methods=['GET', 'POST'])
-#  def check_for_events():
-#      ## this is where logic for checking past events will go
-#      if is_important_event():
-#          # save to database
-#          # prompt the workspace that something important happened
-#          return "important"
-#      return "not important"
 
 @app.route('/add-event', methods=['GET', 'POST'])
 def add_event():
