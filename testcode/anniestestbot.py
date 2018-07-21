@@ -1,13 +1,15 @@
 import os
 import json
+
+with open('buttons.json') as f:
+    button_data = json.load(f)
 import time
 import re
 from slackclient import SlackClient
 
 
 # instantiate Slack client
-slack_client = SlackClient('xoxb-36923392373-403711511895-5mzjLJHDGPs10JgV7NbEhajc')
-
+slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 # starterbot's user ID in Slack: value is assigned after the bot starts up
 starterbot_id = None
 
@@ -15,8 +17,8 @@ starterbot_id = None
 
 # constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-DO_COMMAND = "do"
 HELLO_COMMAND = 'hello'
+EVENT_COPMMAND = 'event'
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
 
 
@@ -55,17 +57,57 @@ def handle_command(command, channel):
     response = None
 
     # This is where you start to implement more commands!
-    if command.startswith(DO_COMMAND):
-        response = "Sure...write some more code then I can do that!"
-    elif command.startswith(HELLO_COMMAND):
+    button = False
+    if command.startswith(HELLO_COMMAND):
         response = "Hi everyone! I'm a bot, bleep, bloop."
+    elif command.startswith(EVENT_COPMMAND):
+        button = True
+        response = json.dumps(button_data)
 
     # Sends the response back to the channel
-    slack_client.api_call(
-        "chat.postMessage",
-        channel=channel,
-        text=response or default_response
-    )
+    if button:
+        slack_client.api_call(
+            "chat.postMessage",
+            channel=channel,
+            text="Good morning, int-elligence!",
+            attachments=[
+                {
+                    "text": "How are you feeling today?",
+                    "fallback": "Oh no, it failed.",
+                    "callback_id": "gm_text",
+                    "color": "#3AA3E3",
+                    "attachment_type": "default",
+                    "actions": [
+                        {
+                            "name": "gm-survey",
+                            "text": "Good!",
+                            "type": "button",
+                            "value": "happy :grinning:",
+                        },
+                        {
+                            "name": "gm-survey",
+                            "text": "Bad!",
+                            "style": "danger",
+                            "type": "button",
+                            "value": "sad :persevere:",
+                            "confirm": {
+                                "title": "Are you sure?",
+                                "text": "Don't feel bad!",
+                                "ok_text": "I still feel bad",
+                                "dismiss_text": "I'm cured"
+                            }
+                        }
+                    ]
+                }
+            ]
+        )
+
+    else:
+        slack_client.api_call(
+            "chat.postMessage",
+            channel=channel,
+            text=response or default_response
+        )
 
 
 if __name__ == "__main__":
