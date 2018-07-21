@@ -5,7 +5,6 @@ import re
 from slackclient import SlackClient
 from slackeventsapi import SlackEventAdapter
 
-
 # slack_client = SlackClient('xoxb-369235392373-402130295793-JB7yKDAzWZ9DnKtehmWGxlYA')
 BOT_TOKEN = "xoxb-369235392373-402130295793-JB7yKDAzWZ9DnKtehmWGxlYA"
 CHANNEL_NAME = "int-elligence"
