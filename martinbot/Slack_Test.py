@@ -85,7 +85,7 @@ def counting():
                             "channels.history",
                               channel = channel_code,
                               )
-        #print(history)
+        print(history)
 
         history_list = history["messages"]
 
