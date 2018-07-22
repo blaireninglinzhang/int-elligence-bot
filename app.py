@@ -4,25 +4,6 @@ from flask_pymongo import PyMongo
 from slackclient import SlackClient
 import os, random, json
 
-import time
-import atexit
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
-
-def print_date_time():
-    print("hello")
-
-scheduler = BackgroundScheduler()
-scheduler.start()
-scheduler.add_job(
-    func=print_date_time,
-    trigger=IntervalTrigger(seconds=60),
-    id='printing_job',
-    name='Print date and time every five seconds',
-    replace_existing=True)
-# Shut down the scheduler when exiting the app
-atexit.register(lambda: scheduler.shutdown())
-
 app = Flask(__name__)
 
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
@@ -74,16 +55,12 @@ MANUAL_MILESTONE = {
 }
 
 SUGGESTED_MILESTONE = {
-    "text": "Hi there! We noticed that this is an exciting time so we added a message as a milestone!",
+    "text": "Hi there! We noticed that this is an exciting time so we added this message to milestones! \n View all milestones by typing `@Memory-Bot popular`",
     "fallback": "Oh no, it failed.",
     "callback_id": "manual_add_text",
     "color": "#3AA3E3",
     "attachment_type": "default"
 }
-
-@app.route('/add', methods=['GET'])
-def add():
-    return "ok"
 
 @app.route('/', methods=['GET', 'POST'])
 def homepage():
@@ -95,6 +72,11 @@ def homepage():
             print(data)
             if data.get('callback_id', '') == "milestone_form" and data.get('submission'):
                 print(data['submission']['milestone_name'])
+                mongo.db.channel_history.insert({'text': data['submission']['milestone_name']})
+                response = Response(response={},
+                    status=200,
+                    mimetype='application/json')
+                return response
             if data.get('callback_id', '') == "manual_add_text" and data.get("actions"):
                 if data["actions"][0]["name"] == "manual_add_yes":
                     slack_client.api_call(
@@ -117,37 +99,51 @@ def homepage():
                 if event_type == "reaction_added":
                     message_time = data['event']['item']['ts']
                     if message_time in INTERNAL_CACHE:
+                        print("increasing count")
                         INTERNAL_CACHE[data['event']['item']['ts']]['count'] += 1
-                        if INTERNAL_CACHE[data['event']['item']['ts']]['count'] > COUNT_THRESHOLD and not INTERNAL_CACHE[message_time].get('stored'):
+                        if INTERNAL_CACHE[message_time]['count'] > COUNT_THRESHOLD and not INTERNAL_CACHE[message_time].get('stored'):
                             slack_client.api_call(
                                 "chat.postMessage",
                                 channel="CBVS7HV1C",
-                                text="Good morning, int-elligence!",
+                                text="What a popular comment! :star-struck:",
                                 attachments=[SUGGESTED_MILESTONE]
                             )
-                            # do this after the user adds shit
+                            print(message_time)
                             messages = slack_client_oauth.api_call(
                                 "channels.history",
                                 channel="CBVS7HV1C",
-                                latest=data['event']['item']['ts'],
+                                latest=message_time,
+                                inclusive=True,
                                 count=1
                             )
                             INTERNAL_CACHE[message_time]['text'] = messages['messages'][0]['text']
-                            mongo.db.channel_history.insert({message_time.replace(".","-"): INTERNAL_CACHE[message_time]})
+                            print("lenghth:   ", len(messages['messages']))
+                            print(messages)
+                            mongo.db.channel_history.insert(INTERNAL_CACHE[message_time])
                             INTERNAL_CACHE[message_time]['stored'] = True
                             print("wrote to database")
                     else:
                         INTERNAL_CACHE[message_time] = {}
-                        INTERNAL_CACHE[message_time]['item'] = data['event']['item']
                         INTERNAL_CACHE[message_time]['count'] = 1
-                    print(INTERNAL_CACHE[data['event']['item']['ts']]['count'])
+                        INTERNAL_CACHE[message_time]['item'] = data['event']['item']
                 if event_type == "app_mention" and "add" in event_text:
                     slack_client.api_call(
                         "chat.postMessage",
                         channel="CBVS7HV1C",
-                        text="Good morning, int-elligence!",
+                        text="Good afternoon, let's add a milestone!",
                         attachments=[MANUAL_MILESTONE]
                     )
+                if event_type == "app_mention" and "popular" in event_text:
+                    [print(x['text']) for x in mongo.db.channel_history.find()]
+                    text = ":triangular_flag_on_post: Here's a few memorable comments that have been said recently: \n"
+                    for index, x in enumerate(list(mongo.db.channel_history.find({}, limit=4).sort([("timestamp", -1), ("id_", -1)]))):
+                        text += ("\n" + str(index+1) + ") *" + x['text'] + "*\n")
+                    slack_client.api_call(
+                        "chat.postMessage",
+                        channel="CBVS7HV1C",
+                        text=text
+                    )
+                    print(text)
                 # testing query from the slack API
                 if data.get('challenge', ''):
                     response['challenge'] = data['challenge']
@@ -158,21 +154,12 @@ def homepage():
     the_time = datetime.now().strftime("%A, %d %b %Y %l:%M %p")
     online_users = mongo.db.channel_history.count()
     print(online_users)
-    return """
-    <h1>Hello heroku</h1>
-    <p>It is currently {time}.</p>
-    <img src="http://loremflickr.com/600/400">
-        """.format(time=the_time)
-
-@app.route('/add-event', methods=['GET', 'POST'])
-def add_event():
-    # save to database
-    # prompt the workspace that something important happened
-    return "not important"
-
-def is_important_event():
-    # this is where code for reading history goes...
-    return bool(random.getrandbits(1))
+    return "Memory Bot added your memory!"
+    #  return """
+    #  <h1>Hello heroku</h1>
+    #  <p>It is currently {time}.</p>
+    #  <img src="http://loremflickr.com/600/400">
+    #      """.format(time=the_time)
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=True)
